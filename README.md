@@ -1,15 +1,9 @@
 # effect-drizzle
 
-To install dependencies:
+This project is based on Lucas Barake's [effect-monorepo database](https://github.com/lucas-barake/effect-monorepo/tree/main/packages/database) package.
 
-```bash
-bun install
-```
+I've added support for the following databases and made it generic for any Drizzle schema.
 
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.2.17. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+- libSQL (Wasm)
+- Expo SQLite
+- Bun SQLite
