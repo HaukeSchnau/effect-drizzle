@@ -21,11 +21,19 @@
   "peerDependencies": {
     "typescript": "^5"
   },
+  "peerDependenciesMeta": {
+    "@libsql/client-wasm": {
+      "optional": true
+    },
+    "expo-sqlite": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
   "dependencies": {
-    "@libsql/client-wasm": "^0.15.9",
     "drizzle-orm": "^0.44.2",
-    "effect": "^3.16.10",
-    "expo-sqlite": "^15.2.12",
-    "pg": "^8.16.3"
+    "effect": "^3.16.10"
   }
 }
