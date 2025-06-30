@@ -1,48 +1,47 @@
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { Redacted } from "effect";
 import * as Effect from "effect/Effect";
 import * as BunDatabase from "../../src/database.bun-sqlite";
-import { Redacted } from "effect";
-import { sql } from "drizzle-orm";
-import * as DbSchema from "./schema";
 
-const Database = BunDatabase.factory<typeof DbSchema>();
+const Schema = {
+	todosTable: sqliteTable("todos", {
+		id: integer("id").primaryKey(),
+		title: text("title").notNull(),
+		completed: integer("completed").notNull(),
+		createdAt: integer("created_at").notNull(),
+		updatedAt: integer("updated_at").notNull(),
+	}),
+};
+
+const Database = BunDatabase.factory<typeof Schema>();
+
+const DatabaseLive = Database.layer({
+	url: Redacted.make(":memory:"),
+	schema: Schema,
+});
 
 const program = Effect.gen(function* () {
-  const db = yield* Database.Database;
+	const db = yield* Database.Database;
 
-  yield* db.transaction(
-    Effect.fnUntraced(function* (tx) {
-      yield* tx((client) =>
-        new Promise((resolve) => {
-          client.run(sql`CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, completed INTEGER, created_at INTEGER, updated_at INTEGER);`);
-          resolve(void 0);
-        })
-      );
+	yield* db.transaction(
+		Effect.fnUntraced(function* (tx) {
+			yield* tx((client) =>
+				client.insert(Schema.todosTable).values({
+					title: "Do something",
+					completed: 0,
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+				}),
+			);
 
-      yield* tx((client) =>
-        client.insert(DbSchema.todosTable).values({
-          title: "Do something",
-          completed: 0,
-          createdAt: new Date().getTime(),
-          updatedAt: new Date().getTime(),
-        }),
-      );
+			const result = yield* tx((client) =>
+				client.select().from(Schema.todosTable),
+			);
 
-      const result = yield* tx((client) =>
-        client.select().from(DbSchema.todosTable),
-      );
-      yield* Effect.log(result);
-
-      yield* Effect.log("Done");
-    }),
-  );
-}).pipe(
-  Effect.provide(
-    Database.layer({
-      url: Redacted.make(":memory:"),
-      schema: DbSchema,
-    }),
-  ),
-);
+			yield* Effect.log(result);
+		}),
+	);
+}).pipe(Effect.provide(DatabaseLive));
 
 BunRuntime.runMain(program);

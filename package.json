@@ -1,39 +1,45 @@
 {
-  "name": "effect-drizzle",
-  "module": "index.ts",
-  "type": "module",
-  "license": "MIT",
-  "exports": {
-    "./libsql-wasm": "./src/database.libsql-wasm.ts",
-    "./expo-sqlite": "./src/database.expo-sqlite.ts",
-    "./bun-sqlite": "./src/database.bun-sqlite.ts"
-  },
-  "devDependencies": {
-    "@effect/platform-bun": "^0.72.3",
-    "@types/bun": "latest",
-    "@types/pg": "^8.15.4",
-    "better-sqlite3": "^12.2.0",
-    "drizzle-kit": "^0.31.4"
-  },
-  "workspaces": [
-    "examples/*"
-  ],
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "peerDependenciesMeta": {
-    "@libsql/client-wasm": {
-      "optional": true
-    },
-    "expo-sqlite": {
-      "optional": true
-    },
-    "pg": {
-      "optional": true
-    }
-  },
-  "dependencies": {
-    "drizzle-orm": "^0.44.2",
-    "effect": "^3.16.10"
-  }
+	"name": "effect-drizzle",
+	"module": "index.ts",
+	"type": "module",
+	"license": "MIT",
+	"exports": {
+		"./libsql-wasm": "./src/database.libsql-wasm.ts",
+		"./expo-sqlite": "./src/database.expo-sqlite.ts",
+		"./bun-sqlite": "./src/database.bun-sqlite.ts"
+	},
+	"scripts": {
+		"lint": "biome check .",
+		"lint:fix": "biome check . --write",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.0.6",
+		"@effect/platform-bun": "^0.72.3",
+		"@types/bun": "latest",
+		"@types/pg": "^8.15.4",
+		"better-sqlite3": "^12.2.0",
+		"drizzle-kit": "^0.31.4"
+	},
+	"workspaces": [
+		"examples/*"
+	],
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"peerDependenciesMeta": {
+		"@libsql/client-wasm": {
+			"optional": true
+		},
+		"expo-sqlite": {
+			"optional": true
+		},
+		"pg": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"drizzle-orm": "^0.44.2",
+		"effect": "^3.16.10"
+	}
 }
