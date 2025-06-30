@@ -6,7 +6,8 @@
 	"exports": {
 		"./libsql-wasm": "./src/database.libsql-wasm.ts",
 		"./expo-sqlite": "./src/database.expo-sqlite.ts",
-		"./bun-sqlite": "./src/database.bun-sqlite.ts"
+		"./bun-sqlite": "./src/database.bun-sqlite.ts",
+		"./generic-sqlite": "./src/generic-sqlite.ts"
 	},
 	"scripts": {
 		"lint": "biome check .",

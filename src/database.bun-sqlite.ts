@@ -1,12 +1,6 @@
 import { Database as BunDatabase, SQLiteError } from "bun:sqlite";
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import {
-	type BunSQLiteDatabase,
-	drizzle,
-	type SQLiteBunTransaction,
-} from "drizzle-orm/bun-sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as Cause from "effect/Cause";
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -14,36 +8,14 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Runtime from "effect/Runtime";
 import { DatabaseError } from "./common";
-
-type TransactionClient<DbSchema extends Record<string, unknown>> =
-	SQLiteBunTransaction<DbSchema, ExtractTablesWithRelations<DbSchema>>;
-
-type Client<DbSchema extends Record<string, unknown>> =
-	BunSQLiteDatabase<DbSchema> & {
-		$client: BunDatabase;
-	};
-
-type TransactionContextShape<DbSchema extends Record<string, unknown>> = <U>(
-	fn: (client: TransactionClient<DbSchema>) => Promise<U>,
-) => Effect.Effect<U, DatabaseError<SQLiteError>>;
-
-const transactionContextFactory = <
-	DbSchema extends Record<string, unknown>,
->() =>
-	class TransactionContext extends Context.Tag("TransactionContext")<
-		TransactionContext,
-		TransactionContextShape<DbSchema>
-	>() {
-		public static readonly provide = (
-			transaction: TransactionContextShape<DbSchema>,
-		): (<A, E, R>(
-			self: Effect.Effect<A, E, R>,
-		) => Effect.Effect<A, E, Exclude<R, TransactionContext>>) =>
-			Effect.provideService(this, transaction);
-	};
-type TransactionContext<DbSchema extends Record<string, unknown>> = ReturnType<
-	typeof transactionContextFactory<DbSchema>
->;
+import {
+	type GenericSqliteClient,
+	type GenericSqliteError,
+	type TransactionClient,
+	type TransactionContext,
+	type TransactionContextShape,
+	transactionContextFactory,
+} from "./generic-sqlite";
 
 const matchSqliteError = (error: unknown) => {
 	if (error instanceof SQLiteError) {
@@ -67,7 +39,7 @@ export type Config<DbSchema extends Record<string, unknown>> = {
 	schema: DbSchema;
 };
 
-const makeService = <DbSchema extends Record<string, unknown>>(
+export const makeService = <DbSchema extends Record<string, unknown>>(
 	config: Config<DbSchema>,
 	transactionContext: TransactionContext<DbSchema>,
 ) =>
@@ -80,7 +52,7 @@ const makeService = <DbSchema extends Record<string, unknown>>(
 		const db = drizzle(connection, { schema: config.schema });
 
 		const execute = Effect.fn(
-			<T>(fn: (client: Client<DbSchema>) => Promise<T>) =>
+			<T>(fn: (client: GenericSqliteClient<DbSchema>) => Promise<T>) =>
 				Effect.tryPromise({
 					try: () => fn(db),
 					catch: (cause) => {
@@ -142,9 +114,9 @@ const makeService = <DbSchema extends Record<string, unknown>>(
 
 		type ExecuteFn = <T>(
 			fn: (
-				client: Client<DbSchema> | TransactionClient<DbSchema>,
+				client: GenericSqliteClient<DbSchema> | TransactionClient<DbSchema>,
 			) => Promise<T>,
-		) => Effect.Effect<T, DatabaseError<SQLiteError>>;
+		) => Effect.Effect<T, DatabaseError<GenericSqliteError>>;
 		const makeQuery =
 			<A, E, R, Input = never>(
 				queryFn: (execute: ExecuteFn, input: Input) => Effect.Effect<A, E, R>,

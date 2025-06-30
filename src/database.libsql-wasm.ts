@@ -1,9 +1,6 @@
-import { type Client as LibSQLClient, LibsqlError } from "@libsql/client-wasm";
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import type { LibSQLDatabase, LibSQLTransaction } from "drizzle-orm/libsql";
+import { LibsqlError } from "@libsql/client-wasm";
 import { drizzle } from "drizzle-orm/libsql/wasm";
 import * as Cause from "effect/Cause";
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -11,36 +8,14 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Runtime from "effect/Runtime";
 import { DatabaseError } from "./common";
-
-type TransactionClient<DbSchema extends Record<string, unknown>> =
-	LibSQLTransaction<DbSchema, ExtractTablesWithRelations<DbSchema>>;
-
-type Client<DbSchema extends Record<string, unknown>> =
-	LibSQLDatabase<DbSchema> & {
-		$client: LibSQLClient;
-	};
-
-type TransactionContextShape<DbSchema extends Record<string, unknown>> = <U>(
-	fn: (client: TransactionClient<DbSchema>) => Promise<U>,
-) => Effect.Effect<U, DatabaseError<Error>>;
-
-const transactionContextFactory = <
-	DbSchema extends Record<string, unknown>,
->() =>
-	class TransactionContext extends Context.Tag("TransactionContext")<
-		TransactionContext,
-		TransactionContextShape<DbSchema>
-	>() {
-		public static readonly provide = (
-			transaction: TransactionContextShape<DbSchema>,
-		): (<A, E, R>(
-			self: Effect.Effect<A, E, R>,
-		) => Effect.Effect<A, E, Exclude<R, TransactionContext>>) =>
-			Effect.provideService(this, transaction);
-	};
-type TransactionContext<DbSchema extends Record<string, unknown>> = ReturnType<
-	typeof transactionContextFactory<DbSchema>
->;
+import {
+	type GenericSqliteClient,
+	type GenericSqliteError,
+	type TransactionClient,
+	type TransactionContext,
+	type TransactionContextShape,
+	transactionContextFactory,
+} from "./generic-sqlite";
 
 const matchSqliteError = (error: unknown) => {
 	if (error instanceof LibsqlError) {
@@ -64,7 +39,7 @@ export type Config<DbSchema extends Record<string, unknown>> = {
 	schema: DbSchema;
 };
 
-const makeService = <DbSchema extends Record<string, unknown>>(
+export const makeService = <DbSchema extends Record<string, unknown>>(
 	config: Config<DbSchema>,
 	transactionContext: TransactionContext<DbSchema>,
 ) =>
@@ -77,7 +52,7 @@ const makeService = <DbSchema extends Record<string, unknown>>(
 		});
 
 		const execute = Effect.fn(
-			<T>(fn: (client: Client<DbSchema>) => Promise<T>) =>
+			<T>(fn: (client: GenericSqliteClient<DbSchema>) => Promise<T>) =>
 				Effect.tryPromise({
 					try: () => fn(db),
 					catch: (cause) => {
@@ -99,49 +74,53 @@ const makeService = <DbSchema extends Record<string, unknown>>(
 				Effect.runtime<R>().pipe(
 					Effect.map((runtime) => Runtime.runPromiseExit(runtime)),
 					Effect.flatMap((runPromiseExit) =>
-						Effect.async<T, DatabaseError<Error> | E, R>((resume) => {
-							db.transaction(async (tx: TransactionClient<DbSchema>) => {
-								const txWrapper = (
-									fn: (client: TransactionClient<DbSchema>) => Promise<any>,
-								) =>
-									Effect.tryPromise({
-										try: () => fn(tx),
-										catch: (cause) => {
-											const error = matchSqliteError(cause);
-											if (error !== null) {
-												return error;
+						Effect.async<T, DatabaseError<GenericSqliteError> | E, R>(
+							(resume) => {
+								db.transaction(async (tx: TransactionClient<DbSchema>) => {
+									const txWrapper = (
+										fn: (client: TransactionClient<DbSchema>) => Promise<any>,
+									) =>
+										Effect.tryPromise({
+											try: () => fn(tx),
+											catch: (cause) => {
+												const error = matchSqliteError(cause);
+												if (error !== null) {
+													return error;
+												}
+												throw cause;
+											},
+										});
+
+									const result = await runPromiseExit(txExecute(txWrapper));
+									Exit.match(result, {
+										onSuccess: (value) => {
+											resume(Effect.succeed(value));
+										},
+										onFailure: (cause) => {
+											if (Cause.isFailure(cause)) {
+												resume(Effect.fail(Cause.originalError(cause) as E));
+											} else {
+												resume(Effect.die(cause));
 											}
-											throw cause;
 										},
 									});
-
-								const result = await runPromiseExit(txExecute(txWrapper));
-								Exit.match(result, {
-									onSuccess: (value) => {
-										resume(Effect.succeed(value));
-									},
-									onFailure: (cause) => {
-										if (Cause.isFailure(cause)) {
-											resume(Effect.fail(Cause.originalError(cause) as E));
-										} else {
-											resume(Effect.die(cause));
-										}
-									},
+								}).catch((cause) => {
+									const error = matchSqliteError(cause);
+									resume(
+										error !== null ? Effect.fail(error) : Effect.die(cause),
+									);
 								});
-							}).catch((cause) => {
-								const error = matchSqliteError(cause);
-								resume(error !== null ? Effect.fail(error) : Effect.die(cause));
-							});
-						}),
+							},
+						),
 					),
 				),
 		);
 
 		type ExecuteFn = <T>(
 			fn: (
-				client: Client<DbSchema> | TransactionClient<DbSchema>,
+				client: GenericSqliteClient<DbSchema> | TransactionClient<DbSchema>,
 			) => Promise<T>,
-		) => Effect.Effect<T, DatabaseError<Error>>;
+		) => Effect.Effect<T, DatabaseError<GenericSqliteError>>;
 		const makeQuery =
 			<A, E, R, Input = never>(
 				queryFn: (execute: ExecuteFn, input: Input) => Effect.Effect<A, E, R>,
