@@ -2,6 +2,7 @@
   "name": "effect-drizzle",
   "module": "index.ts",
   "type": "module",
+  "license": "MIT",
   "exports": {
     "./libsql-wasm": "./src/database.libsql-wasm.ts",
     "./expo-sqlite": "./src/database.expo-sqlite.ts",
