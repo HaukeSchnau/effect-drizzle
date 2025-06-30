@@ -8,6 +8,14 @@ I've added support for the following databases and made it generic for any Drizz
 - Expo SQLite
 - Bun SQLite
 
+## Installation
+
+Since this package is not published to npm, you need to install directly from the repository (for now).
+
+```bash
+bun add github:HaukeSchnau/effect-drizzle
+```
+
 ## Usage (Bun SQLite)
 
 ```ts
