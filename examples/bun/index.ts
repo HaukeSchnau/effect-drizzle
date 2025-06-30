@@ -1,11 +1,11 @@
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import { sql } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { Redacted } from "effect";
-import * as Effect from "effect/Effect";
-import * as BunDatabase from "../../src/database.bun-sqlite";
+import { Effect, Redacted } from "effect";
+import { factory } from "effect-drizzle/bun-sqlite";
 
 const Schema = {
-	todosTable: sqliteTable("todos", {
+	todos: sqliteTable("todos", {
 		id: integer("id").primaryKey(),
 		title: text("title").notNull(),
 		completed: integer("completed").notNull(),
@@ -14,7 +14,7 @@ const Schema = {
 	}),
 };
 
-const Database = BunDatabase.factory<typeof Schema>();
+const Database = factory<typeof Schema>();
 
 const DatabaseLive = Database.layer({
 	url: Redacted.make(":memory:"),
@@ -26,8 +26,18 @@ const program = Effect.gen(function* () {
 
 	yield* db.transaction(
 		Effect.fnUntraced(function* (tx) {
+			yield* tx(
+				(client) =>
+					new Promise((resolve) => {
+						client.run(
+							sql`CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, completed INTEGER, created_at INTEGER, updated_at INTEGER);`,
+						);
+						resolve(void 0);
+					}),
+			);
+
 			yield* tx((client) =>
-				client.insert(Schema.todosTable).values({
+				client.insert(Schema.todos).values({
 					title: "Do something",
 					completed: 0,
 					createdAt: Date.now(),
@@ -35,9 +45,7 @@ const program = Effect.gen(function* () {
 				}),
 			);
 
-			const result = yield* tx((client) =>
-				client.select().from(Schema.todosTable),
-			);
+			const result = yield* tx((client) => client.select().from(Schema.todos));
 
 			yield* Effect.log(result);
 		}),

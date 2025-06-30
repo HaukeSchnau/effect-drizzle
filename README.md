@@ -13,12 +13,11 @@ I've added support for the following databases and made it generic for any Drizz
 ```ts
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { Redacted } from "effect";
-import * as Effect from "effect/Effect";
-import * as BunDatabase from "../../src/database.bun-sqlite";
+import { Redacted, Effect } from "effect";
+import * as BunDatabase from "effect-drizzle/bun-sqlite";
 
 const Schema = {
- todosTable: sqliteTable("todos", {
+ todos: sqliteTable("todos", {
   id: integer("id").primaryKey(),
   title: text("title").notNull(),
   completed: integer("completed").notNull(),
@@ -40,7 +39,7 @@ const program = Effect.gen(function* () {
  yield* db.transaction(
   Effect.fnUntraced(function* (tx) {
    yield* tx((client) =>
-    client.insert(Schema.todosTable).values({
+    client.insert(Schema.todos).values({
      title: "Do something",
      completed: 0,
      createdAt: Date.now(),
@@ -49,7 +48,7 @@ const program = Effect.gen(function* () {
    );
 
    const result = yield* tx((client) =>
-    client.select().from(Schema.todosTable),
+    client.select().from(Schema.todos),
    );
 
    yield* Effect.log(result);
@@ -58,5 +57,4 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(DatabaseLive));
 
 BunRuntime.runMain(program);
-
 ```

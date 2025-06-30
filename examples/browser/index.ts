@@ -1,20 +1,29 @@
 import { sql } from "drizzle-orm";
-import * as Effect from "effect/Effect";
-import * as Redacted from "effect/Redacted";
-import * as DatabaseCore from "../../src/database.libsql-wasm";
-import * as DbSchema from "./schema";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { Effect, Redacted } from "effect";
+import { factory } from "effect-drizzle/libsql-wasm";
 
-const Database = DatabaseCore.factory<typeof DbSchema>();
+const Schema = {
+	todos: sqliteTable("todos", {
+		id: integer("id").primaryKey(),
+		title: text("title").notNull(),
+		completed: integer("completed").notNull(),
+		createdAt: integer("created_at").notNull(),
+		updatedAt: integer("updated_at").notNull(),
+	}),
+};
+
+const Database = factory<typeof Schema>();
 
 const DatabaseLive = Database.layer({
 	url: Redacted.make("file:local.db"),
-	schema: DbSchema,
+	schema: Schema,
 });
 
 const program = Effect.gen(function* () {
 	const db = yield* Database.Database;
 
-	yield* db.transaction(
+	return yield* db.transaction(
 		Effect.fnUntraced(function* (tx) {
 			yield* tx((client) =>
 				client.run(
@@ -23,7 +32,7 @@ const program = Effect.gen(function* () {
 			);
 
 			yield* tx((client) =>
-				client.insert(DbSchema.todosTable).values({
+				client.insert(Schema.todos).values({
 					title: "Do something",
 					completed: 0,
 					createdAt: Date.now(),
@@ -31,12 +40,10 @@ const program = Effect.gen(function* () {
 				}),
 			);
 
-			const result = yield* tx((client) =>
-				client.select().from(DbSchema.todosTable),
-			);
+			const result = yield* tx((client) => client.select().from(Schema.todos));
 			yield* Effect.log(result);
 
-			yield* Effect.log("Done");
+			return result;
 		}),
 	);
 }).pipe(Effect.provide(DatabaseLive));
@@ -44,7 +51,6 @@ const program = Effect.gen(function* () {
 (async () => {
 	const result = await Effect.runPromiseExit(program);
 
-	console.log(result);
 	document.body.innerHTML = `
         <pre>${JSON.stringify(result, null, 2)}</pre>
     `;
