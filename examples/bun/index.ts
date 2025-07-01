@@ -21,19 +21,20 @@ const DatabaseLive = Database.layer({
 	schema: Schema,
 });
 
+const ensurePromise = <T>(value: T | Promise<T>) =>
+	value instanceof Promise ? value : Promise.resolve(value);
+
 const program = Effect.gen(function* () {
 	const db = yield* Database.Database;
 
 	yield* db.transaction(
 		Effect.fnUntraced(function* (tx) {
-			yield* tx(
-				(client) =>
-					new Promise((resolve) => {
-						client.run(
-							sql`CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, completed INTEGER, created_at INTEGER, updated_at INTEGER);`,
-						);
-						resolve(void 0);
-					}),
+			yield* tx((client) =>
+				ensurePromise(
+					client.run(
+						sql`CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, completed INTEGER, created_at INTEGER, updated_at INTEGER);`,
+					),
+				),
 			);
 
 			yield* tx((client) =>
