@@ -99,3 +99,5 @@ export const genericDatabaseFactory = <
 		Database: database,
 	};
 };
+
+export type { DatabaseError };
