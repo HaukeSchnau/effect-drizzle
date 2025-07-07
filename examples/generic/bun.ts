@@ -1,4 +1,5 @@
-import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import { DevTools } from "@effect/experimental";
+import { BunRuntime, BunSocket } from "@effect/platform-bun";
 import { Effect, Layer, Redacted } from "effect";
 import { makeService } from "../../src/database.bun-sqlite";
 import { Database, Schema } from "./contract";
@@ -15,4 +16,15 @@ const DatabaseLive = Layer.scoped(
 	),
 );
 
-BunRuntime.runMain(sampleEffect.pipe(Effect.provide(DatabaseLive)));
+const DevToolsLive = DevTools.layerWebSocket().pipe(
+	Layer.provide(BunSocket.layerWebSocketConstructor),
+);
+
+BunRuntime.runMain(
+	sampleEffect.pipe(
+		Effect.delay("1 second"),
+		Effect.forever,
+		Effect.provide(DatabaseLive),
+		Effect.provide(DevToolsLive),
+	),
+);

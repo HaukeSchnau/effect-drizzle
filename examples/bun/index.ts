@@ -2,7 +2,7 @@ import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import { sql } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { Effect, Redacted } from "effect";
-import { factory } from "effect-drizzle/bun-sqlite";
+import { factory } from "effect-drizzle/libsql";
 
 const Schema = {
 	todos: sqliteTable("todos", {

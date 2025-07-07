@@ -1,15 +1,16 @@
 {
-	"name": "bun",
-	"module": "index.ts",
-	"type": "module",
-	"private": true,
-	"devDependencies": {
-		"@types/bun": "latest"
-	},
-	"peerDependencies": {
-		"typescript": "^5"
-	},
-	"dependencies": {
-		"effect-drizzle": "file:../.."
-	}
+  "name": "example-generic",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@effect/experimental": "^0.51.1",
+    "effect-drizzle": "file:../.."
+  }
 }
