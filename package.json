@@ -1,6 +1,6 @@
 {
 	"name": "@schnau/effect-drizzle",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"module": "index.ts",
 	"type": "module",
 	"license": "MIT",
@@ -9,6 +9,7 @@
 		"./expo-sqlite": "./src/database.expo-sqlite.ts",
 		"./bun-sqlite": "./src/database.bun-sqlite.ts",
 		"./libsql": "./src/database.libsql.ts",
+		"./postgres": "./src/database.postgres.ts",
 		"./generic-sqlite": "./src/generic-sqlite.ts"
 	},
 	"scripts": {
