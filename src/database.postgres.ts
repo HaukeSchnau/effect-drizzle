@@ -234,12 +234,14 @@ const makeService = <DbSchema extends Record<string, unknown>>(
 		} as const;
 	});
 
-type Shape<DbSchema extends Record<string, unknown>> = Effect.Effect.Success<
-	ReturnType<typeof makeService<DbSchema>>
->;
+export type PostgresDatabaseService<DbSchema extends Record<string, unknown>> =
+	Effect.Effect.Success<ReturnType<typeof makeService<DbSchema>>>;
 
 const databaseFactory = <DbSchema extends Record<string, unknown>>() =>
-	class Database extends Effect.Tag("Database")<Database, Shape<DbSchema>>() {};
+	class Database extends Effect.Tag("Database")<
+		Database,
+		PostgresDatabaseService<DbSchema>
+	>() {};
 
 export const factory = <DbSchema extends Record<string, unknown>>() => {
 	const transactionContext = transactionContextFactory<DbSchema>();
