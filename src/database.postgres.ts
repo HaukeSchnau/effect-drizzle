@@ -234,8 +234,45 @@ const makeService = <DbSchema extends Record<string, unknown>>(
 		} as const;
 	});
 
+// export type PostgresDatabaseService<DbSchema extends Record<string, unknown>> =
+// 	Effect.Effect.Success<ReturnType<typeof makeService<DbSchema>>>;
+
+type Execute<DbSchema extends Record<string, unknown>> = <T>(
+	fn: (client: Client<DbSchema>) => Promise<T>,
+) => Effect.Effect.AsEffect<
+	Effect.Effect<T, DatabaseError<pg.DatabaseError>, never>
+>;
+
+type Transaction<DbSchema extends Record<string, unknown>> = <T, E, R>(
+	txExecute: (tx: TransactionContextShape<DbSchema>) => Effect.Effect<T, E, R>,
+) => Effect.Effect.AsEffect<
+	Effect.Effect<T, DatabaseError<pg.DatabaseError> | E, R>
+>;
+
+type ExecuteFn<DbSchema extends Record<string, unknown>> = <T>(
+	fn: (client: Client<DbSchema> | TransactionClient<DbSchema>) => Promise<T>,
+) => Effect.Effect<T, DatabaseError<pg.DatabaseError>>;
+
+type MakeQuery<DbSchema extends Record<string, unknown>> = <
+	A,
+	E,
+	R,
+	Input = never,
+>(
+	queryFn: (
+		execute: ExecuteFn<DbSchema>,
+		input: Input,
+	) => Effect.Effect<A, E, R>,
+) => (
+	...args: [Input] extends [never] ? [] : [input: Input]
+) => Effect.Effect<A, E, R>;
+
 export type PostgresDatabaseService<DbSchema extends Record<string, unknown>> =
-	Effect.Effect.Success<ReturnType<typeof makeService<DbSchema>>>;
+	{
+		execute: Execute<DbSchema>;
+		transaction: Transaction<DbSchema>;
+		makeQuery: MakeQuery<DbSchema>;
+	};
 
 const databaseFactory = <DbSchema extends Record<string, unknown>>() =>
 	class Database extends Effect.Tag("Database")<
