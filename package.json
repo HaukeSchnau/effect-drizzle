@@ -1,6 +1,6 @@
 {
 	"name": "@schnau/effect-drizzle",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"module": "index.ts",
 	"type": "module",
 	"license": "MIT",
@@ -15,6 +15,7 @@
 	"scripts": {
 		"lint": "biome check .",
 		"lint:fix": "biome check . --write",
+		"pub": "bunx npm publish --registry https://npm.schnau.dev/ ",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
