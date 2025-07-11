@@ -1,22 +1,11 @@
 import { drizzle } from "drizzle-orm/expo-sqlite";
-import { pipe } from "effect";
-import * as Cause from "effect/Cause";
+import { Effect } from "effect";
 import type { Tag } from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
-import * as Runtime from "effect/Runtime";
 import { openDatabaseSync } from "expo-sqlite";
-import type { DatabaseError } from "./common";
-import type {
-	Execute,
-	GenericSqliteClient,
-	GenericSqliteError,
-	MakeQuery,
-	Transaction,
-	TransactionClient,
-	TransactionContextShape,
+import {
+	type GenericDatabaseService,
+	makeGenericDatabaseService,
 } from "./generic-sqlite";
 
 const matchSqliteError = (error: unknown) => {
@@ -33,10 +22,10 @@ export type Config<DbSchema extends Record<string, unknown>> = {
 
 export const makeService = <
 	DbSchema extends Record<string, unknown>,
-	TTransactionContextTag extends Tag<any, TransactionContextShape<DbSchema>>,
+	DBTag extends Tag<any, GenericDatabaseService<DbSchema>>,
 >(
 	config: Config<DbSchema>,
-	transactionContextTag: TTransactionContextTag,
+	dbTag: DBTag,
 ) =>
 	Effect.gen(function* () {
 		const connection = yield* Effect.acquireRelease(
@@ -46,104 +35,5 @@ export const makeService = <
 
 		const db = drizzle(connection, { schema: config.schema });
 
-		const execute: Execute<DbSchema> = Effect.fn(
-			<T>(fn: (client: GenericSqliteClient<DbSchema>) => Promise<T>) =>
-				Effect.tryPromise({
-					try: () => fn(db),
-					catch: (cause) => {
-						const error = matchSqliteError(cause);
-						if (error !== null) {
-							return error;
-						}
-						throw cause;
-					},
-				}),
-		);
-
-		const transaction: Transaction<DbSchema, TTransactionContextTag> =
-			Effect.fn("Database.transaction")(
-				<T, E, R>(
-					txExecute:
-						| ((tx: Execute<DbSchema>) => Effect.Effect<T, E, R>)
-						| Effect.Effect<T, E, R>,
-				) =>
-					Effect.runtime<Exclude<R, TTransactionContextTag>>().pipe(
-						Effect.map((runtime) => Runtime.runPromiseExit(runtime)),
-						Effect.flatMap((runPromiseExit) =>
-							Effect.async<
-								T,
-								DatabaseError<GenericSqliteError> | E,
-								Exclude<R, TTransactionContextTag>
-							>((resume) => {
-								db.transaction(async (tx: TransactionClient<DbSchema>) => {
-									const txWrapper = (
-										fn: (client: TransactionClient<DbSchema>) => Promise<any>,
-									) =>
-										Effect.tryPromise({
-											try: () => fn(tx),
-											catch: (cause) => {
-												const error = matchSqliteError(cause);
-												if (error !== null) {
-													return error;
-												}
-												throw cause;
-											},
-										});
-									const result = await runPromiseExit(
-										pipe(
-											typeof txExecute === "function"
-												? txExecute(txWrapper)
-												: txExecute,
-											Effect.provideService(transactionContextTag, {
-												execute: txWrapper,
-											}),
-										),
-									);
-									Exit.match(result, {
-										onSuccess: (value) => {
-											resume(Effect.succeed(value));
-										},
-										onFailure: (cause) => {
-											if (Cause.isFailure(cause)) {
-												resume(Effect.fail(Cause.originalError(cause) as E));
-											} else {
-												resume(Effect.die(cause));
-											}
-										},
-									});
-								}).catch((cause) => {
-									const error = matchSqliteError(cause);
-									resume(
-										error !== null ? Effect.fail(error) : Effect.die(cause),
-									);
-								});
-							}),
-						),
-					),
-			);
-
-		const makeQuery: MakeQuery<DbSchema> =
-			<A, E, R, Input = never>(
-				queryFn: (
-					execute: Execute<DbSchema>,
-					input: Input,
-				) => Effect.Effect<A, E, R>,
-			) =>
-			(
-				...args: [Input] extends [never] ? [] : [input: Input]
-			): Effect.Effect<A, E, R> => {
-				const input = args[0] as Input;
-				return Effect.serviceOption(transactionContextTag).pipe(
-					Effect.map(Option.getOrNull),
-					Effect.flatMap((txOrNull) =>
-						queryFn(txOrNull?.execute ?? execute, input),
-					),
-				);
-			};
-
-		return {
-			execute,
-			transaction,
-			makeQuery,
-		} as const;
+		return makeGenericDatabaseService(db, dbTag, matchSqliteError);
 	});
