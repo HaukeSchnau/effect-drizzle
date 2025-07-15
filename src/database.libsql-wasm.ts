@@ -2,11 +2,11 @@ import { LibsqlError } from "@libsql/client-wasm";
 import { drizzle } from "drizzle-orm/libsql/wasm";
 import type { Tag } from "effect/Context";
 import * as Redacted from "effect/Redacted";
-import { DatabaseError } from "./common";
+import { DatabaseError } from "./common.js";
 import {
 	type GenericDatabaseService,
 	makeGenericDatabaseService,
-} from "./generic-sqlite";
+} from "./generic-sqlite.js";
 
 const matchSqliteError = (error: unknown) => {
 	if (error instanceof LibsqlError) {

@@ -6,8 +6,8 @@ import * as pg from "pg";
 import {
 	DatabaseError as BaseDatabaseError,
 	DatabaseConnectionLostError,
-} from "./common";
-import { type DatabaseService, makeDatabaseService } from "./postgres";
+} from "./common.js";
+import { type DatabaseService, makeDatabaseService } from "./postgres.js";
 
 export type { DatabaseConnectionLostError, DatabaseService };
 export type DatabaseError = BaseDatabaseError<pg.DatabaseError>;

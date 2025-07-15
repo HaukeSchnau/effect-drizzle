@@ -5,7 +5,7 @@ import type {
 } from "drizzle-orm/sqlite-core";
 import { Cause, Effect, Exit, Option, pipe, Runtime } from "effect";
 import type { Tag } from "effect/Context";
-import type { DatabaseError } from "./common";
+import type { DatabaseError } from "./common.js";
 
 export type GenericSqliteClient<TSchema extends Record<string, unknown>> =
 	BaseSQLiteDatabase<"sync" | "async", unknown, TSchema>;

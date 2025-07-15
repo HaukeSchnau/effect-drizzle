@@ -7,7 +7,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 import { Cause, Effect, Exit, Option, pipe, Runtime } from "effect";
 import type { Tag } from "effect/Context";
 import type pg from "pg";
-import type { DatabaseConnectionLostError, DatabaseError } from "./common";
+import type { DatabaseConnectionLostError, DatabaseError } from "./common.js";
 
 type Client<DbSchema extends Record<string, unknown>> =
 	NodePgDatabase<DbSchema> & {

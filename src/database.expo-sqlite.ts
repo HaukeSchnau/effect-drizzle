@@ -6,7 +6,7 @@ import { openDatabaseSync } from "expo-sqlite";
 import {
 	type GenericDatabaseService,
 	makeGenericDatabaseService,
-} from "./generic-sqlite";
+} from "./generic-sqlite.js";
 
 const matchSqliteError = (error: unknown) => {
 	if (error instanceof Error) {
@@ -32,6 +32,13 @@ export const makeService = <
 			Effect.sync(() => openDatabaseSync(Redacted.value(config.url))),
 			(connection) => Effect.sync(() => connection.closeSync()),
 		);
+
+		connection.execSync("PRAGMA journal_mode = WAL;");
+		connection.execSync("PRAGMA synchronous = NORMAL;");
+		connection.execSync("PRAGMA foreign_keys = ON;");
+		connection.execSync("PRAGMA temp_store = MEMORY;");
+		connection.execSync("PRAGMA busy_timeout = 5000;");
+		connection.execSync("PRAGMA auto_vacuum = INCREMENTAL;");
 
 		const db = drizzle(connection, { schema: config.schema });
 
