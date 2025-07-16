@@ -21,11 +21,11 @@ export type Config<DbSchema extends Record<string, unknown>> = {
 } & (
 	| {
 			url: Redacted.Redacted;
-			connection: never;
+			connection?: never;
 	  }
 	| {
 			connection: SQLiteDatabase;
-			url: never;
+			url?: never;
 	  }
 );
 
