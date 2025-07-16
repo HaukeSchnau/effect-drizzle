@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/expo-sqlite";
 import { Effect } from "effect";
 import type { Tag } from "effect/Context";
 import * as Redacted from "effect/Redacted";
-import { openDatabaseSync } from "expo-sqlite";
+import { openDatabaseSync, type SQLiteDatabase } from "expo-sqlite";
 import {
 	type GenericDatabaseService,
 	makeGenericDatabaseService,
@@ -16,9 +16,18 @@ const matchSqliteError = (error: unknown) => {
 };
 
 export type Config<DbSchema extends Record<string, unknown>> = {
-	url: Redacted.Redacted;
+	// url: Redacted.Redacted;
 	schema: DbSchema;
-};
+} & (
+	| {
+			url: Redacted.Redacted;
+			connection: never;
+	  }
+	| {
+			connection: SQLiteDatabase;
+			url: never;
+	  }
+);
 
 export const makeService = <
 	DbSchema extends Record<string, unknown>,
@@ -28,10 +37,12 @@ export const makeService = <
 	dbTag: DBTag,
 ) =>
 	Effect.gen(function* () {
-		const connection = yield* Effect.acquireRelease(
-			Effect.sync(() => openDatabaseSync(Redacted.value(config.url))),
-			(connection) => Effect.sync(() => connection.closeSync()),
-		);
+		const connection =
+			config.connection ??
+			(yield* Effect.acquireRelease(
+				Effect.sync(() => openDatabaseSync(Redacted.value(config.url))),
+				(connection) => Effect.sync(() => connection.closeSync()),
+			));
 
 		connection.execSync("PRAGMA journal_mode = WAL;");
 		connection.execSync("PRAGMA synchronous = NORMAL;");
