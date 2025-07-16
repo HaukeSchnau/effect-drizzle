@@ -7,7 +7,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 import { Cause, Effect, Exit, Option, pipe, Runtime } from "effect";
 import type { Tag } from "effect/Context";
 import type pg from "pg";
-import type { DatabaseConnectionLostError, DatabaseError } from "./common.js";
+import type { DatabaseError } from "./common.js";
 
 type Client<DbSchema extends Record<string, unknown>> =
 	NodePgDatabase<DbSchema> & {
@@ -23,13 +23,13 @@ type TransactionClient<DbSchema extends Record<string, unknown>> =
 
 export type Execute<DbSchema extends Record<string, unknown>> = <T>(
 	fn: (client: Client<DbSchema> | TransactionClient<DbSchema>) => Promise<T>,
-) => Effect.Effect<T, DatabaseError<pg.DatabaseError>>;
+) => Effect.Effect<T, DatabaseError<pg.DatabaseError | Error>>;
 
 export type Transaction<DbSchema extends Record<string, unknown>> = <T, E, R>(
 	txExecute:
 		| ((service: DatabaseService<DbSchema>) => Effect.Effect<T, E, R>)
 		| Effect.Effect<T, E, R>,
-) => Effect.Effect<T, DatabaseError<pg.DatabaseError> | E, R>;
+) => Effect.Effect<T, DatabaseError<pg.DatabaseError | Error> | E, R>;
 
 export type MakeQuery<DbSchema extends Record<string, unknown>> = <
 	A,
@@ -46,7 +46,10 @@ export type DatabaseService<DbSchema extends Record<string, unknown>> = {
 	execute: Execute<DbSchema>;
 	transaction: Transaction<DbSchema>;
 	makeQuery: MakeQuery<DbSchema>;
-	setupConnectionListeners: Effect.Effect<void, DatabaseConnectionLostError>;
+	setupConnectionListeners: Effect.Effect<
+		void,
+		DatabaseError<pg.DatabaseError | Error>
+	>;
 };
 
 export type { DatabaseError };
@@ -60,8 +63,13 @@ export const makeDatabaseService = <
 >(
 	db: Client<DbSchema>,
 	dbTag: DBTag,
-	matchPgError: (error: unknown) => DatabaseError<pg.DatabaseError> | null,
-	setupConnectionListeners: Effect.Effect<void, DatabaseConnectionLostError>,
+	matchPgError: (
+		error: unknown,
+	) => DatabaseError<pg.DatabaseError | Error> | null,
+	setupConnectionListeners: Effect.Effect<
+		void,
+		DatabaseError<pg.DatabaseError | Error>
+	>,
 ): DatabaseService<DbSchema> => {
 	const makeExecute =
 		(db: Client<DbSchema> | TransactionClient<DbSchema>): Execute<DbSchema> =>
@@ -95,42 +103,44 @@ export const makeDatabaseService = <
 			Effect.runtime<R>().pipe(
 				Effect.map((runtime) => Runtime.runPromiseExit(runtime)),
 				Effect.flatMap((runPromiseExit) =>
-					Effect.async<T, DatabaseError<pg.DatabaseError> | E, R>((resume) => {
-						ensurePromise(
-							db.transaction(async (tx: TransactionClient<DbSchema>) => {
-								const service = {
-									execute: makeExecute(tx),
-									transaction: makeTransaction(tx),
-									makeQuery,
-									setupConnectionListeners,
-								};
+					Effect.async<T, DatabaseError<pg.DatabaseError | Error> | E, R>(
+						(resume) => {
+							ensurePromise(
+								db.transaction(async (tx: TransactionClient<DbSchema>) => {
+									const service = {
+										execute: makeExecute(tx),
+										transaction: makeTransaction(tx),
+										makeQuery,
+										setupConnectionListeners,
+									};
 
-								const result = await runPromiseExit(
-									pipe(
-										typeof txExecute === "function"
-											? txExecute(service)
-											: txExecute,
-										Effect.provideService(dbTag, service),
-									),
-								);
-								Exit.match(result, {
-									onSuccess: (value) => {
-										resume(Effect.succeed(value));
-									},
-									onFailure: (cause) => {
-										if (Cause.isFailure(cause)) {
-											resume(Effect.fail(Cause.originalError(cause) as E));
-										} else {
-											resume(Effect.die(cause));
-										}
-									},
-								});
-							}),
-						).catch((cause) => {
-							const error = matchPgError(cause);
-							resume(error !== null ? Effect.fail(error) : Effect.die(cause));
-						});
-					}),
+									const result = await runPromiseExit(
+										pipe(
+											typeof txExecute === "function"
+												? txExecute(service)
+												: txExecute,
+											Effect.provideService(dbTag, service),
+										),
+									);
+									Exit.match(result, {
+										onSuccess: (value) => {
+											resume(Effect.succeed(value));
+										},
+										onFailure: (cause) => {
+											if (Cause.isFailure(cause)) {
+												resume(Effect.fail(Cause.originalError(cause) as E));
+											} else {
+												resume(Effect.die(cause));
+											}
+										},
+									});
+								}),
+							).catch((cause) => {
+								const error = matchPgError(cause);
+								resume(error !== null ? Effect.fail(error) : Effect.die(cause));
+							});
+						},
+					),
 				),
 			);
 

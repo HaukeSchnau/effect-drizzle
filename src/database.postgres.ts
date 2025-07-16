@@ -1,16 +1,14 @@
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as pg from "pg";
-import {
-	DatabaseError as BaseDatabaseError,
-	DatabaseConnectionLostError,
-} from "./common.js";
+import { DatabaseError as BaseDatabaseError } from "./common.js";
 import { type DatabaseService, makeDatabaseService } from "./postgres.js";
 
-export type { DatabaseConnectionLostError, DatabaseService };
-export type DatabaseError = BaseDatabaseError<pg.DatabaseError>;
+export type { DatabaseService };
+export type DatabaseError = BaseDatabaseError<pg.DatabaseError | Error>;
 export { BaseDatabaseError };
 
 const matchPgError = (error: unknown): DatabaseError | null => {
@@ -31,6 +29,19 @@ const matchPgError = (error: unknown): DatabaseError | null => {
 					type: "connection_error",
 					cause: error,
 				});
+		}
+	}
+
+	if (error instanceof DrizzleQueryError) {
+		if (error.cause instanceof AggregateError) {
+			for (const cause of error.cause.errors) {
+				if (cause.constructor.name === "ExceptionWithHostPort") {
+					return new BaseDatabaseError({
+						type: "connection_error",
+						cause: cause,
+					});
+				}
+			}
 		}
 	}
 	return null;
@@ -67,17 +78,17 @@ export const makeService = <
 			Effect.timeoutFail({
 				duration: "10 seconds",
 				onTimeout: () =>
-					new DatabaseConnectionLostError({
+					new BaseDatabaseError({
+						type: "connection_error",
 						cause: new Error("[Database] Failed to connect: timeout"),
-						message: "[Database] Failed to connect: timeout",
 					}),
 			}),
 			Effect.catchTag(
 				"UnknownException",
 				(error) =>
-					new DatabaseConnectionLostError({
-						cause: error.cause,
-						message: "[Database] Failed to connect",
+					new BaseDatabaseError({
+						type: "connection_error",
+						cause: error,
 					}),
 			),
 			Effect.tap(() =>
@@ -88,13 +99,13 @@ export const makeService = <
 		);
 
 		const setupConnectionListeners = Effect.zipRight(
-			Effect.async<void, DatabaseConnectionLostError>((resume) => {
+			Effect.async<void, DatabaseError>((resume) => {
 				pool.on("error", (error) => {
 					resume(
 						Effect.fail(
-							new DatabaseConnectionLostError({
+							new BaseDatabaseError({
+								type: "connection_error",
 								cause: error,
-								message: error.message,
 							}),
 						),
 					);

@@ -1,12 +1,5 @@
 import { Data } from "effect";
 
-export class DatabaseConnectionLostError extends Data.TaggedError(
-	"DatabaseConnectionLostError",
-)<{
-	cause: unknown;
-	message: string;
-}> {}
-
 export class DatabaseError<
 	BaseError extends { message: string },
 > extends Data.TaggedError("DatabaseError")<{
